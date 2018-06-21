@@ -6,7 +6,6 @@ import android.content.pm.PackageManager
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
 import android.support.v4.app.ActivityCompat
-
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
 import android.content.BroadcastReceiver
@@ -27,9 +26,6 @@ import com.google.android.gms.maps.model.BitmapDescriptor
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import io.fabric.sdk.android.Fabric;
 
-
-
-
 class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private lateinit var mMap: GoogleMap
@@ -48,15 +44,12 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         val mapFragment = supportFragmentManager
                 .findFragmentById(R.id.map) as SupportMapFragment
         mapFragment.getMapAsync(this)
-
-
     }
 
     /**
      * Manipulates the map once available.
      * This callback is triggered when the map is ready to be used.
      * This is where we can add markers or lines, add listeners or move the camera. In this case,
-     * we just add a marker near Sydney, Australia.
      * If Google Play services is not installed on the device, the user will be prompted to install
      * it inside the SupportMapFragment. This method will only be triggered once the user has
      * installed Google Play services and returned to the app.
@@ -72,11 +65,12 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         } else {
             startService(Intent(this,LocalisationService::class.java))
         }
-        // Add a marker in Sydney and move the camera
         val DEFAULT_LAT_TLSE = 43.608316  //Lattitude St Sernin Tlse
         val DEFAULT_LON_TLSE = 1.441804 //Longitude St Sernin Tlse
         val toulouse = LatLng(DEFAULT_LAT_TLSE, DEFAULT_LON_TLSE)
         mMap.moveCamera(CameraUpdateFactory.newLatLng(toulouse))
+        var zoom : CameraUpdate = CameraUpdateFactory.zoomTo(15f)
+        mMap.animateCamera(zoom)
         getData()
     }
 
@@ -86,24 +80,21 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             val message = intent.getStringExtra("Status")
             val b = intent.getBundleExtra("Location")
             val lastKnownLoc = b.getParcelable<Parcelable>("Location") as Location
-            if (lastKnownLoc != null && ::mMap.isInitialized && !isFocused) {
+            if (::mMap.isInitialized && !isFocused) {
                 isFocused = true
                 var myPosLatLng = LatLng(lastKnownLoc.latitude, lastKnownLoc.longitude)
                 mMap.moveCamera(CameraUpdateFactory.newLatLng(myPosLatLng))
                 var zoom : CameraUpdate = CameraUpdateFactory.zoomTo(15f)
                 mMap.animateCamera(zoom)
-
             }
         }
     }
 
     private fun getData(){
         var databaseReference = FirebaseDatabase.getInstance().getReference("position")
-        var contactList = ArrayList<UserClass>()
         databaseReference.addValueEventListener(object : ValueEventListener {
 
             override fun onDataChange(snapshot: DataSnapshot) {
-                println("TestBed: ${snapshot.value}")
                 mMap.clear()
                 for (postSnapshot in snapshot.getChildren()) {
                     val deviceName = Settings.Secure.getString(getContentResolver(), "bluetooth_name")
@@ -112,10 +103,11 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                     var test = currentUser!!.deviceName
                     var latLng : LatLng = LatLng(currentUser!!.latitude!!, currentUser!!.longitude!!)
                     var bitmapDescriptor : BitmapDescriptor? = null
-                    if(deviceName.equals(currentUserDeviceName)){
-                        bitmapDescriptor = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN)
+                    if(deviceName != null && deviceName.equals(currentUserDeviceName)){
+                        bitmapDescriptor = BitmapDescriptorFactory.fromResource(R.drawable.quintero)
+                    } else {
+                        bitmapDescriptor = BitmapDescriptorFactory.fromResource(R.drawable.risitete)
                     }
-
                     mMap.addMarker(MarkerOptions()
                             .position(latLng)
                             .title(currentUser.deviceName + " " + currentUser.batteryLvl + "% " + currentUser.captureDate))
@@ -123,16 +115,15 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 }
             }
 
-            override fun onCancelled(error: DatabaseError) {}
-        })
+            override fun onCancelled(error: DatabaseError) {
 
-        Log.d("LIIIIIIIST", (contactList.size).toString())
+            }
+        })
     }
 
     override fun onRequestPermissionsResult(requestCode : Int ,
                                             permissions: Array<String>,
                                             grantResults: IntArray){
-        //      it is IntArray rather than Array<Int>   ---^
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             Log.d("PERMISSION", "User Permission for Location Granted")
             startService(Intent(this,LocalisationService::class.java))
@@ -143,5 +134,4 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         super.onResume()
         isFocused = false
     }
-
 }

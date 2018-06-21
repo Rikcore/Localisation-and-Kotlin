@@ -13,24 +13,8 @@ import android.support.v4.content.LocalBroadcastManager
 import com.google.firebase.database.FirebaseDatabase
 import java.text.SimpleDateFormat
 import java.util.*
-import kotlin.collections.ArrayList
-import android.app.ActivityManager
-import android.app.ActivityManager.RunningAppProcessInfo
 import android.os.*
-import android.os.Debug.getMemoryInfo
-import android.os.Environment.getExternalStorageDirectory
-import android.widget.Toast
 import android.net.ConnectivityManager
-import android.telephony.CellInfoGsm
-import android.telephony.TelephonyManager
-import android.telephony.CellSignalStrengthLte
-import android.telephony.CellInfoLte
-import android.telephony.CellSignalStrengthGsm
-import android.telephony.CellSignalStrengthWcdma
-import android.telephony.CellInfoWcdma
-import android.telephony.CellInfo
-
-
 
 
 class LocalisationService : Service() {
@@ -38,12 +22,12 @@ class LocalisationService : Service() {
     private var locationManager : LocationManager? = null
 
     override fun onBind(intent: Intent): IBinder {
-        TODO("Return the communication channel to the service.")
+        throw UnsupportedOperationException("Not yet implemented");
     }
 
-    override fun onStartCommand(intent: Intent, flags: Int, startId: Int): Int {
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         getLocation()
-        return Service.START_REDELIVER_INTENT
+        return Service.START_STICKY
     }
 
     override fun onDestroy() {
@@ -113,7 +97,6 @@ class LocalisationService : Service() {
         } else {
             return "Sur batterie"
         }
-
     }
 
     fun getMemoryAvailable() : String{
@@ -125,7 +108,6 @@ class LocalisationService : Service() {
         Log.e("", "Available MB : $megAvailable")
         return gigAvailable.toString() + " GB"
     }
-
 
     fun chkStatus() : String {
         val connMgr = this.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager

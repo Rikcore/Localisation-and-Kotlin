@@ -17,9 +17,12 @@ import java.text.SimpleDateFormat
 import java.util.*
 import android.os.*
 import android.net.ConnectivityManager
+import android.provider.Telephony
+import android.telephony.TelephonyManager
 import android.view.View
 import java.io.File
 import java.io.FileOutputStream
+import java.security.AccessController.getContext
 
 class LocalisationService : Service() {
 
@@ -90,7 +93,9 @@ class LocalisationService : Service() {
 
     private fun sendData(user : UserClass){
         val database = FirebaseDatabase.getInstance()
-        val myRef = database.getReference("position/" + user.deviceName)
+        val nodeId = Settings.Secure.getString(applicationContext.getContentResolver(),
+                Settings.Secure.ANDROID_ID)
+        val myRef = database.getReference("position/" + nodeId)
 
         myRef.setValue(user)
     }
@@ -135,4 +140,6 @@ class LocalisationService : Service() {
     fun getUptime() : Int {
         return (SystemClock.elapsedRealtime() / 1000 / 60 / 60).toInt()
     }
+
+
 }

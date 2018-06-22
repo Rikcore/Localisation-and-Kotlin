@@ -1,21 +1,21 @@
 package com.rikcore.kotlinproject
 
 import android.Manifest
-import android.content.Intent
+import android.content.*
 import android.content.pm.PackageManager
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
 import android.support.v4.app.ActivityCompat
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.IntentFilter
 import android.location.Location
 import android.os.Parcelable
 import android.provider.Settings
 import android.support.v4.content.LocalBroadcastManager
+import android.support.v7.app.ActionBar
 import android.util.Log
+import android.view.View
+import android.widget.Switch
 import com.google.android.gms.maps.*
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
@@ -31,11 +31,17 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     private lateinit var mMap: GoogleMap
     private val LOCATION_PERMISSION_RC = 1
     private var isFocused = false
+    private var userPref: SharedPreferences? = null
+    private var userEdit: SharedPreferences.Editor? = null
+    private lateinit var switchLocation : Switch
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_maps)
         Fabric.with(this, Crashlytics())
+
+        userPref =this.getSharedPreferences("user_info", 0)
+        userEdit = userPref?.edit()
 
         LocalBroadcastManager.getInstance(this).registerReceiver(
                 mMessageReceiver, IntentFilter("GPSLocationUpdates"));
@@ -44,6 +50,18 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         val mapFragment = supportFragmentManager
                 .findFragmentById(R.id.map) as SupportMapFragment
         mapFragment.getMapAsync(this)
+
+        val actionBar = getSupportActionBar();
+        actionBar?.setCustomView(R.layout.switch_layout);
+        actionBar?.setDisplayOptions(ActionBar.DISPLAY_SHOW_HOME or ActionBar.DISPLAY_SHOW_CUSTOM)
+
+        switchLocation = findViewById(R.id.actionbar_switch)
+        switchLocation.isChecked = userPref!!.getBoolean("isVisible", true)
+
+        switchLocation.setOnCheckedChangeListener { buttonView, isChecked ->
+            userEdit?.putBoolean("isVisible", isChecked)
+            userEdit?.apply()
+        }
     }
 
     /**
@@ -63,13 +81,15 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             ActivityCompat.requestPermissions(this,
                     arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION), LOCATION_PERMISSION_RC)
         } else {
+            switchLocation.visibility = View.VISIBLE
             startService(Intent(this,LocalisationService::class.java))
         }
-        val DEFAULT_LAT_TLSE = 43.608316  //Lattitude St Sernin Tlse
-        val DEFAULT_LON_TLSE = 1.441804 //Longitude St Sernin Tlse
-        val toulouse = LatLng(DEFAULT_LAT_TLSE, DEFAULT_LON_TLSE)
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(toulouse))
-        var zoom : CameraUpdate = CameraUpdateFactory.zoomTo(15f)
+
+        val defaultLat = userPref?.getString("latitude", "43.608316")
+        val defaultLong = userPref?.getString("longitude", "1.441804")
+        val defaultPos = LatLng(defaultLat!!.toDouble(), defaultLong!!.toDouble())
+        mMap.moveCamera(CameraUpdateFactory.newLatLng(defaultPos))
+        val zoom : CameraUpdate = CameraUpdateFactory.zoomTo(15f)
         mMap.animateCamera(zoom)
         getData()
     }
@@ -99,19 +119,22 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 for (postSnapshot in snapshot.getChildren()) {
                     val deviceName = Settings.Secure.getString(getContentResolver(), "bluetooth_name")
                     var currentUser = postSnapshot.getValue(UserClass::class.java)
-                    var currentUserDeviceName = currentUser!!.deviceName
-                    var test = currentUser!!.deviceName
-                    var latLng : LatLng = LatLng(currentUser!!.latitude!!, currentUser!!.longitude!!)
-                    var bitmapDescriptor : BitmapDescriptor? = null
-                    if(deviceName != null && deviceName.equals(currentUserDeviceName)){
-                        bitmapDescriptor = BitmapDescriptorFactory.fromResource(R.drawable.quintero)
-                    } else {
-                        bitmapDescriptor = BitmapDescriptorFactory.fromResource(R.drawable.risitete)
+                    if(currentUser!!.isVisible){
+                        var currentUserDeviceName = currentUser.deviceName
+                        var test = currentUser!!.deviceName
+                        var latLng : LatLng = LatLng(currentUser.latitude!!, currentUser.longitude!!)
+                        var bitmapDescriptor : BitmapDescriptor? = null
+                        if(deviceName != null && deviceName.equals(currentUserDeviceName)){
+                            bitmapDescriptor = BitmapDescriptorFactory.fromResource(R.drawable.quintero)
+                        } else {
+                            bitmapDescriptor = BitmapDescriptorFactory.fromResource(R.drawable.risitete)
+                        }
+                        mMap.addMarker(MarkerOptions()
+                                .position(latLng)
+                                .title(currentUser.deviceName + " " + currentUser.batteryLvl + "% " + currentUser.captureDate))
+                                .setIcon(bitmapDescriptor)
                     }
-                    mMap.addMarker(MarkerOptions()
-                            .position(latLng)
-                            .title(currentUser.deviceName + " " + currentUser.batteryLvl + "% " + currentUser.captureDate))
-                            .setIcon(bitmapDescriptor)
+
                 }
             }
 

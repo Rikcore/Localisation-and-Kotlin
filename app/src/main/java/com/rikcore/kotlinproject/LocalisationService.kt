@@ -4,6 +4,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.SharedPreferences
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
@@ -16,16 +17,19 @@ import java.util.*
 import android.os.*
 import android.net.ConnectivityManager
 
-
 class LocalisationService : Service() {
 
     private var locationManager : LocationManager? = null
+    private var userPref: SharedPreferences? = null
+    private var userEdit: SharedPreferences.Editor? = null
 
     override fun onBind(intent: Intent): IBinder {
         throw UnsupportedOperationException("Not yet implemented");
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        userPref = this.getSharedPreferences("user_info", 0)
+        userEdit = userPref?.edit()
         getLocation()
         return Service.START_STICKY
     }
@@ -50,6 +54,8 @@ class LocalisationService : Service() {
     private val locationListener: LocationListener = object : LocationListener {
         override fun onLocationChanged(location: Location) {
             //Do some shit
+            userEdit?.putString("latitude", location.latitude.toString())
+            userEdit?.putString("longitude", location.longitude.toString())
             val bm = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
             val batLevel = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY).toString()
             val deviceName = Settings.Secure.getString(getContentResolver(), "bluetooth_name")
@@ -59,7 +65,7 @@ class LocalisationService : Service() {
             val memory = getMemoryAvailable()
             val network = chkStatus()
             Log.d("LOCALISATION", (location.latitude).toString() + " " + (location.longitude).toString() + " " + batLevel + "%")
-            val myProfile = UserClass(deviceName, batLevel, location.latitude, location.longitude, currentDate, chargeStatus, memory, network)
+            val myProfile = UserClass(deviceName, batLevel, location.latitude, location.longitude, currentDate, chargeStatus, memory, network, userPref!!.getBoolean("isVisible", true))
             sendData(myProfile)
             sendMessageToActivity(location, "Position")
         }

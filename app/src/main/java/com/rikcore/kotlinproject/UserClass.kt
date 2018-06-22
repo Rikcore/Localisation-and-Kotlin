@@ -12,12 +12,13 @@ class UserClass {
     var chargeStatus: String? = null
     var memoryAvailable: String? = null
     var networkStatus: String? = null
+    var isVisible: Boolean = true
 
     constructor() {
         // Default constructor required for calls to DataSnapshot.getValue(User.class)
     }
 
-    constructor(deviceName: String, batteryLvl: String, latitude: Double, longitude: Double, captureDate: String, chargeStatus: String, memory : String, networkStatus : String) {
+    constructor(deviceName: String, batteryLvl: String, latitude: Double, longitude: Double, captureDate: String, chargeStatus: String, memory : String, networkStatus : String, isVisible: Boolean) {
         this.deviceName = deviceName
         this.batteryLvl = batteryLvl
         this.latitude = latitude
@@ -26,6 +27,7 @@ class UserClass {
         this.chargeStatus = chargeStatus
         this.memoryAvailable = memory
         this.networkStatus = networkStatus
+        this.isVisible = isVisible
     }
 
 

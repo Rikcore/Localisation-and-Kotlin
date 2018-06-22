@@ -83,6 +83,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         } else {
             switchLocation.visibility = View.VISIBLE
             startService(Intent(this,LocalisationService::class.java))
+            getData()
         }
 
         val defaultLat = userPref?.getString("latitude", "43.608316")
@@ -91,7 +92,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         mMap.moveCamera(CameraUpdateFactory.newLatLng(defaultPos))
         val zoom : CameraUpdate = CameraUpdateFactory.zoomTo(15f)
         mMap.animateCamera(zoom)
-        getData()
+
     }
 
     private val mMessageReceiver = object : BroadcastReceiver() {
@@ -150,6 +151,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             Log.d("PERMISSION", "User Permission for Location Granted")
             startService(Intent(this,LocalisationService::class.java))
+            getData()
         }
     }
 

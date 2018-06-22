@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
+import android.graphics.Bitmap
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
@@ -16,6 +17,9 @@ import java.text.SimpleDateFormat
 import java.util.*
 import android.os.*
 import android.net.ConnectivityManager
+import android.view.View
+import java.io.File
+import java.io.FileOutputStream
 
 class LocalisationService : Service() {
 
@@ -65,7 +69,7 @@ class LocalisationService : Service() {
             val memory = getMemoryAvailable()
             val network = chkStatus()
             Log.d("LOCALISATION", (location.latitude).toString() + " " + (location.longitude).toString() + " " + batLevel + "%")
-            val myProfile = UserClass(deviceName, batLevel, location.latitude, location.longitude, currentDate, chargeStatus, memory, network, userPref!!.getBoolean("isVisible", true))
+            val myProfile = UserClass(deviceName, batLevel, location.latitude, location.longitude, currentDate, chargeStatus, memory, network, userPref!!.getBoolean("isVisible", true), getUptime())
             sendData(myProfile)
             sendMessageToActivity(location, "Position")
         }
@@ -126,5 +130,9 @@ class LocalisationService : Service() {
         } else {
             return "Impossible"
         }
+    }
+
+    fun getUptime() : Int {
+        return (SystemClock.elapsedRealtime() / 1000 / 60 / 60).toInt()
     }
 }

@@ -3,6 +3,7 @@ package com.rikcore.kotlinproject
 import android.Manifest
 import android.content.*
 import android.content.pm.PackageManager
+import android.hardware.*
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
 import android.support.v4.app.ActivityCompat
@@ -11,11 +12,11 @@ import com.google.android.gms.maps.model.MarkerOptions
 import android.location.Location
 import android.os.Parcelable
 import android.provider.Settings
+import android.support.constraint.ConstraintLayout
 import android.support.v4.content.LocalBroadcastManager
-import android.support.v7.app.ActionBar
 import android.util.Log
 import android.view.View
-import android.widget.Switch
+import android.widget.*
 import com.google.android.gms.maps.*
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
@@ -26,7 +27,8 @@ import com.google.android.gms.maps.model.BitmapDescriptor
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import io.fabric.sdk.android.Fabric;
 
-class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
+class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListener {
+
 
     private lateinit var mMap: GoogleMap
     private val LOCATION_PERMISSION_RC = 1
@@ -34,11 +36,19 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     private var userPref: SharedPreferences? = null
     private var userEdit: SharedPreferences.Editor? = null
     private lateinit var switchLocation : Switch
+    private lateinit var editTextName : EditText
+    private lateinit var buttonName : Button
+    private lateinit var settingsLayout : ConstraintLayout
+
+    private lateinit var sensorManager : SensorManager
+    private var mAccelLast : Double = 0.0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_maps)
         Fabric.with(this, Crashlytics())
+        sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
+        sensorManager.registerListener(this, sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER), SensorManager.SENSOR_DELAY_NORMAL)
 
         userPref =this.getSharedPreferences("user_info", 0)
         userEdit = userPref?.edit()
@@ -51,16 +61,30 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 .findFragmentById(R.id.map) as SupportMapFragment
         mapFragment.getMapAsync(this)
 
-        val actionBar = getSupportActionBar();
-        actionBar?.setCustomView(R.layout.switch_layout);
-        actionBar?.setDisplayOptions(ActionBar.DISPLAY_SHOW_HOME or ActionBar.DISPLAY_SHOW_CUSTOM)
-
         switchLocation = findViewById(R.id.actionbar_switch)
+        editTextName = findViewById(R.id.editTextName)
+        buttonName = findViewById(R.id.buttonName)
+        settingsLayout = findViewById(R.id.settingsLayout)
+        settingsLayout.bringToFront()
+
         switchLocation.isChecked = userPref!!.getBoolean("isVisible", true)
 
         switchLocation.setOnCheckedChangeListener { buttonView, isChecked ->
             userEdit?.putBoolean("isVisible", isChecked)
             userEdit?.apply()
+        }
+
+        buttonName.setOnClickListener {
+            val name = editTextName.text.toString()
+            if (!name.equals("")){
+                userEdit?.putString("userName", name)
+                userEdit?.apply()
+                Toast.makeText(this, "Pseudo enregistré, mise à jour à la prochaine localisation", Toast.LENGTH_LONG).show()
+                editTextName.text.clear()
+                editTextName.hint = name
+            } else {
+                Toast.makeText(this, "Merci de choisir un pseudo", Toast.LENGTH_LONG).show()
+            }
         }
     }
 
@@ -119,14 +143,14 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 mMap.clear()
                 for (postSnapshot in snapshot.getChildren()) {
                     val deviceName = Settings.Secure.getString(getContentResolver(), "bluetooth_name")
-                    var currentUser = postSnapshot.getValue(UserClass::class.java)
+                    val currentUser = postSnapshot.getValue(UserClass::class.java)
                     if(currentUser!!.isVisible){
-                        var currentUserDeviceName = currentUser.deviceName
-                        var test = currentUser!!.deviceName
-                        var latLng : LatLng = LatLng(currentUser.latitude!!, currentUser.longitude!!)
-                        var bitmapDescriptor : BitmapDescriptor? = null
-                        if(deviceName != null && deviceName.equals(currentUserDeviceName)){
+                        val currentUserDeviceName = currentUser.deviceName
+                        val latLng = LatLng(currentUser.latitude!!, currentUser.longitude!!)
+                        var bitmapDescriptor: BitmapDescriptor?
+                        if(deviceName != null && deviceName.equals(currentUserDeviceName) || currentUser.deviceName.equals(userPref!!.getString("userName", deviceName))){
                             bitmapDescriptor = BitmapDescriptorFactory.fromResource(R.drawable.quintero)
+                            editTextName.hint = currentUserDeviceName
                         } else {
                             bitmapDescriptor = BitmapDescriptorFactory.fromResource(R.drawable.risitete)
                         }
@@ -159,4 +183,25 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         super.onResume()
         isFocused = false
     }
+
+    override fun onAccuracyChanged(p0: Sensor?, p1: Int) {
+    }
+
+    override fun onSensorChanged(p0: SensorEvent?) {
+        val x = p0!!.values[0]
+        val y = p0.values[1]
+        val z = p0.values[2]
+        val mAccelCurrent = Math.sqrt((x * x + y * y + z * z).toDouble())
+        val delta = mAccelCurrent - mAccelLast
+        mAccelLast = mAccelCurrent
+        if (delta > 8) {
+            if(settingsLayout.visibility == View.VISIBLE){
+                settingsLayout.visibility = View.GONE
+            } else {
+                settingsLayout.visibility= View.VISIBLE
+            }
+        }
+    }
 }
+
+

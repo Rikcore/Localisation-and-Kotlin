@@ -39,6 +39,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
     private lateinit var editTextName : EditText
     private lateinit var buttonName : Button
     private lateinit var settingsLayout : ConstraintLayout
+    private lateinit var progressBar: ProgressBar
 
     private lateinit var sensorManager : SensorManager
     private var mAccelLast : Double = 0.0
@@ -53,6 +54,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
         userPref =this.getSharedPreferences("user_info", 0)
         userEdit = userPref?.edit()
 
+
         LocalBroadcastManager.getInstance(this).registerReceiver(
                 mMessageReceiver, IntentFilter("GPSLocationUpdates"));
 
@@ -65,8 +67,10 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
         editTextName = findViewById(R.id.editTextName)
         buttonName = findViewById(R.id.buttonName)
         settingsLayout = findViewById(R.id.settingsLayout)
-        settingsLayout.bringToFront()
+        progressBar = findViewById(R.id.progressBar)
 
+        progressBar.visibility = View.VISIBLE
+        settingsLayout.bringToFront()
         switchLocation.isChecked = userPref!!.getBoolean("isVisible", true)
 
         switchLocation.setOnCheckedChangeListener { buttonView, isChecked ->
@@ -113,10 +117,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
         val defaultLat = userPref?.getString("latitude", "43.608316")
         val defaultLong = userPref?.getString("longitude", "1.441804")
         val defaultPos = LatLng(defaultLat!!.toDouble(), defaultLong!!.toDouble())
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(defaultPos))
-        val zoom : CameraUpdate = CameraUpdateFactory.zoomTo(15f)
-        mMap.animateCamera(zoom)
-
+        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(defaultPos, 15f))
     }
 
     private val mMessageReceiver = object : BroadcastReceiver() {
@@ -127,16 +128,17 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
             val lastKnownLoc = b.getParcelable<Parcelable>("Location") as Location
             if (::mMap.isInitialized && !isFocused) {
                 isFocused = true
-                var myPosLatLng = LatLng(lastKnownLoc.latitude, lastKnownLoc.longitude)
+                val myPosLatLng = LatLng(lastKnownLoc.latitude, lastKnownLoc.longitude)
                 mMap.moveCamera(CameraUpdateFactory.newLatLng(myPosLatLng))
-                var zoom : CameraUpdate = CameraUpdateFactory.zoomTo(15f)
+                val zoom : CameraUpdate = CameraUpdateFactory.zoomTo(15f)
                 mMap.animateCamera(zoom)
+                progressBar.visibility = View.GONE
             }
         }
     }
 
     private fun getData(){
-        var databaseReference = FirebaseDatabase.getInstance().getReference("position")
+        val databaseReference = FirebaseDatabase.getInstance().getReference("position")
         databaseReference.addValueEventListener(object : ValueEventListener {
 
             override fun onDataChange(snapshot: DataSnapshot) {
@@ -159,7 +161,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
                                 .title(currentUser.deviceName + " " + currentUser.batteryLvl + "% " + currentUser.captureDate))
                                 .setIcon(bitmapDescriptor)
                     }
-
                 }
             }
 

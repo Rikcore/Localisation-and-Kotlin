@@ -96,14 +96,11 @@ class LocalisationService : Service() {
     fun chargeStatus(context: Context) : String {
         val intent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         val plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1)
-        if (plugged == BatteryManager.BATTERY_PLUGGED_AC){
-            return "Branché sur secteur"
-        } else if(plugged == BatteryManager.BATTERY_PLUGGED_USB){
-            return "Branché en USB"
-        } else if(plugged == BatteryManager.BATTERY_PLUGGED_WIRELESS){
-            return "Charge sans fil"
-        } else {
-            return "Sur batterie"
+        return when (plugged) {
+            BatteryManager.BATTERY_PLUGGED_AC -> "Branché sur secteur"
+            BatteryManager.BATTERY_PLUGGED_USB -> "Branché en USB"
+            BatteryManager.BATTERY_PLUGGED_WIRELESS -> "Charge sans fil"
+            else -> "Sur batterie"
         }
     }
 
@@ -121,12 +118,10 @@ class LocalisationService : Service() {
         val connMgr = this.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val wifi = connMgr.getNetworkInfo(ConnectivityManager.TYPE_WIFI)
         val mobile = connMgr.getNetworkInfo(ConnectivityManager.TYPE_MOBILE)
-        if (wifi.isConnectedOrConnecting) {
-            return "Wifi"
-        } else if (mobile.isConnectedOrConnecting) {
-            return "Cellulaire"
-        } else {
-            return "Impossible"
+        return when {
+            wifi.isConnectedOrConnecting -> "Wifi"
+            mobile.isConnectedOrConnecting -> "Cellulaire"
+            else -> "Impossible"
         }
     }
 

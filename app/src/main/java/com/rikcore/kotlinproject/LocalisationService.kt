@@ -54,17 +54,13 @@ class LocalisationService : Service() {
     private val locationListener: LocationListener = object : LocationListener {
         override fun onLocationChanged(location: Location) {
             //Do some shit
-            userEdit?.putString("latitude", location.latitude.toString())
-            userEdit?.putString("longitude", location.longitude.toString())
-            val bm = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
-            val batLevel = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY).toString()
+            localSaveLocation(location)
+            val currentDate = getCurrentDateInString()
+            val batLevel = getBatteryLevel()
             val deviceName = Settings.Secure.getString(getContentResolver(), "bluetooth_name")
-            val sdf = SimpleDateFormat("dd/M/yyyy HH:mm:ss", Locale.FRANCE)
-            val currentDate = sdf.format(Date())
             val chargeStatus = chargeStatus(applicationContext)
             val memory = getMemoryAvailable()
             val network = chkStatus()
-            Log.d("LOCALISATION", (location.latitude).toString() + " " + (location.longitude).toString() + " " + batLevel + "%")
             val myProfile = UserClass(userPref!!.getString("userName", deviceName), batLevel, location.latitude, location.longitude, currentDate, chargeStatus, memory, network, userPref!!.getBoolean("isVisible", true), getUptime())
             sendData(myProfile)
             sendMessageToActivity(location, "Position")
@@ -72,6 +68,21 @@ class LocalisationService : Service() {
         override fun onStatusChanged(provider: String, status: Int, extras: Bundle) {}
         override fun onProviderEnabled(provider: String) {}
         override fun onProviderDisabled(provider: String) {}
+    }
+
+    private fun localSaveLocation (location : Location){
+        userEdit?.putString("latitude", location.latitude.toString())
+        userEdit?.putString("longitude", location.longitude.toString())
+    }
+
+    private fun getBatteryLevel() : String {
+        val bm = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+        return bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY).toString()
+    }
+
+    private fun getCurrentDateInString() : String {
+        val sdf = SimpleDateFormat("dd/M/yyyy HH:mm:ss", Locale.FRANCE)
+        return sdf.format(Date())
     }
 
     private fun sendMessageToActivity(l: Location, msg: String) {
@@ -89,7 +100,6 @@ class LocalisationService : Service() {
         val nodeId = Settings.Secure.getString(applicationContext.getContentResolver(),
                 Settings.Secure.ANDROID_ID)
         val myRef = database.getReference("position/" + nodeId)
-
         myRef.setValue(user)
     }
 

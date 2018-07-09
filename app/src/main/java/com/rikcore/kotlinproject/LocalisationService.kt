@@ -56,12 +56,13 @@ class LocalisationService : Service() {
             //Do some shit
             localSaveLocation(location)
             val currentDate = getCurrentDateInString()
+            val devideId = getDeviceId()
             val batLevel = getBatteryLevel()
             val deviceName = Settings.Secure.getString(getContentResolver(), "bluetooth_name")
             val chargeStatus = chargeStatus(applicationContext)
             val memory = getMemoryAvailable()
             val network = chkStatus()
-            val myProfile = UserClass(userPref!!.getString("userName", deviceName), batLevel, location.latitude, location.longitude, currentDate, chargeStatus, memory, network, userPref!!.getBoolean("isVisible", true), getUptime())
+            val myProfile = UserClass(userPref!!.getString("userName", deviceName), devideId, batLevel, location.latitude, location.longitude, currentDate, chargeStatus, memory, network, userPref!!.getBoolean("isVisible", true), getUptime())
             sendData(myProfile)
             sendMessageToActivity(location, "Position")
         }
@@ -73,6 +74,11 @@ class LocalisationService : Service() {
     private fun localSaveLocation (location : Location){
         userEdit?.putString("latitude", location.latitude.toString())
         userEdit?.putString("longitude", location.longitude.toString())
+    }
+
+    private fun getDeviceId() : String {
+        return Settings.Secure.getString(applicationContext.getContentResolver(),
+                Settings.Secure.ANDROID_ID)
     }
 
     private fun getBatteryLevel() : String {
@@ -97,9 +103,7 @@ class LocalisationService : Service() {
 
     private fun sendData(user : UserClass){
         val database = FirebaseDatabase.getInstance()
-        val nodeId = Settings.Secure.getString(applicationContext.getContentResolver(),
-                Settings.Secure.ANDROID_ID)
-        val myRef = database.getReference("position/" + nodeId)
+        val myRef = database.getReference("position/" + user.deviceId)
         myRef.setValue(user)
     }
 

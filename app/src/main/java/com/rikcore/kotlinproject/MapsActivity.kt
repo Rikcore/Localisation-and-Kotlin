@@ -7,8 +7,6 @@ import android.hardware.*
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
 import android.support.v4.app.ActivityCompat
-import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.MarkerOptions
 import android.location.Location
 import android.os.Parcelable
 import android.provider.Settings
@@ -23,8 +21,7 @@ import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import com.crashlytics.android.Crashlytics;
-import com.google.android.gms.maps.model.BitmapDescriptor
-import com.google.android.gms.maps.model.BitmapDescriptorFactory
+import com.google.android.gms.maps.model.*
 import io.fabric.sdk.android.Fabric;
 
 class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListener {
@@ -38,8 +35,11 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
     private lateinit var switchLocation : Switch
     private lateinit var editTextName : EditText
     private lateinit var buttonName : Button
+    private lateinit var buttonImage : Button
     private lateinit var settingsLayout : ConstraintLayout
     private lateinit var progressBar: ProgressBar
+
+    private lateinit var markerMap : HashMap<Marker, UserClass>
 
     private lateinit var sensorManager : SensorManager
     private var mAccelLast : Double = 0.0
@@ -66,6 +66,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
         switchLocation = findViewById(R.id.actionbar_switch)
         editTextName = findViewById(R.id.editTextName)
         buttonName = findViewById(R.id.buttonName)
+        buttonImage = findViewById(R.id.buttonImage)
         settingsLayout = findViewById(R.id.settingsLayout)
         progressBar = findViewById(R.id.progressBar)
 
@@ -90,6 +91,15 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
                 Toast.makeText(this, "Merci de choisir un pseudo", Toast.LENGTH_LONG).show()
             }
         }
+
+        buttonImage.setOnClickListener {
+            val intent = Intent()
+            intent.type = "image/*"
+            intent.action = Intent.ACTION_GET_CONTENT
+            startActivityForResult(Intent.createChooser(intent, "Select Picture"), 2)
+        }
+
+
     }
 
     /**
@@ -118,6 +128,13 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
         val defaultLong = userPref?.getString("longitude", "1.441804")
         val defaultPos = LatLng(defaultLat!!.toDouble(), defaultLong!!.toDouble())
         mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(defaultPos, 15f))
+
+        mMap.setOnInfoWindowLongClickListener {
+            val cibledUser = markerMap.get(it)
+            if (cibledUser != null) {
+                Toast.makeText(this, cibledUser.batteryLvl, Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     private val mMessageReceiver = object : BroadcastReceiver() {
@@ -139,6 +156,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
 
     private fun getData(){
         val databaseReference = FirebaseDatabase.getInstance().getReference("position")
+        markerMap = HashMap<Marker, UserClass>()
         databaseReference.addValueEventListener(object : ValueEventListener {
 
             override fun onDataChange(snapshot: DataSnapshot) {
@@ -156,10 +174,15 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
                         } else {
                             bitmapDescriptor = BitmapDescriptorFactory.fromResource(R.drawable.risitete)
                         }
-                        mMap.addMarker(MarkerOptions()
+
+
+                        val marker : Marker = mMap.addMarker(MarkerOptions()
                                 .position(latLng)
-                                .title(currentUser.deviceName + " " + currentUser.batteryLvl + "% " + currentUser.captureDate))
-                                .setIcon(bitmapDescriptor)
+                                .title(currentUser.deviceName + " " + currentUser.batteryLvl + "% " + currentUser.captureDate)
+                                .icon(bitmapDescriptor))
+
+                        markerMap[marker] = currentUser
+
                     }
                 }
             }
@@ -168,6 +191,11 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
 
             }
         })
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent) {
+        super.onActivityResult(requestCode, resultCode, data)
+        Toast.makeText(this, requestCode.toString(), Toast.LENGTH_LONG).show()
     }
 
     override fun onRequestPermissionsResult(requestCode : Int ,

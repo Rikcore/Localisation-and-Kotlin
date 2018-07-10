@@ -16,6 +16,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 import android.os.*
 import android.net.ConnectivityManager
+import kotlin.collections.HashMap
 
 class LocalisationService : Service() {
 
@@ -55,14 +56,14 @@ class LocalisationService : Service() {
         override fun onLocationChanged(location: Location) {
             //Do some shit
             localSaveLocation(location)
-            val currentDate = getCurrentDateInString()
-            val devideId = getDeviceId()
+            val deviceId = getDeviceId()
+            val deviceName = userPref!!.getString("userName", Settings.Secure.getString(contentResolver, "bluetooth_name"))
             val batLevel = getBatteryLevel()
-            val deviceName = Settings.Secure.getString(getContentResolver(), "bluetooth_name")
+            val currentDate = getCurrentDateInString()
             val chargeStatus = chargeStatus(applicationContext)
             val memory = getMemoryAvailable()
             val network = chkStatus()
-            val myProfile = UserClass(userPref!!.getString("userName", deviceName), devideId, batLevel, location.latitude, location.longitude, currentDate, chargeStatus, memory, network, userPref!!.getBoolean("isVisible", true), getUptime())
+            val myProfile = UserClass(deviceId, deviceName, batLevel, location.latitude, location.longitude, currentDate, chargeStatus, memory, network, getUptime())
             sendData(myProfile)
             sendMessageToActivity(location, "Position")
         }
@@ -104,7 +105,18 @@ class LocalisationService : Service() {
     private fun sendData(user : UserClass){
         val database = FirebaseDatabase.getInstance()
         val myRef = database.getReference("position/" + user.deviceId)
-        myRef.setValue(user)
+        val userMap = HashMap<String, Any?>()
+        userMap["batteryLvl"] = user.batteryLvl
+        userMap["captureDate"] = user.captureDate
+        userMap["chargeStatus"] = user.chargeStatus
+        userMap["deviceId"] = user.deviceId
+        userMap["deviceName"] = user.deviceName
+        userMap["latitude"] = user.latitude
+        userMap["longitude"] = user.longitude
+        userMap["memoryAvailable"] = user.memoryAvailable
+        userMap["networkStatus"] = user.networkStatus
+        userMap["uptime"] = user.uptime
+        myRef.updateChildren(userMap)
     }
 
     fun chargeStatus(context: Context) : String {

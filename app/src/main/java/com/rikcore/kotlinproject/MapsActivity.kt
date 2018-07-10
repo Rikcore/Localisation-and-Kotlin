@@ -3,6 +3,8 @@ package com.rikcore.kotlinproject
 import android.Manifest
 import android.content.*
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.hardware.*
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
@@ -22,7 +24,9 @@ import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import com.crashlytics.android.Crashlytics;
 import com.google.android.gms.maps.model.*
+import com.google.firebase.storage.FirebaseStorage
 import io.fabric.sdk.android.Fabric;
+import java.net.URL
 
 class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListener {
 
@@ -32,17 +36,19 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
     private var isFocused = false
     private var userPref: SharedPreferences? = null
     private var userEdit: SharedPreferences.Editor? = null
-    private lateinit var switchLocation : Switch
     private lateinit var editTextName : EditText
     private lateinit var buttonName : Button
     private lateinit var buttonImage : Button
     private lateinit var settingsLayout : ConstraintLayout
     private lateinit var progressBar: ProgressBar
 
-    private lateinit var markerMap : HashMap<Marker, UserClass>
+    private var localeCacheMap = HashMap<String, Marker>()
 
     private lateinit var sensorManager : SensorManager
     private var mAccelLast : Double = 0.0
+
+    private val RESULT_LOAD_IMAGE = 111
+    private lateinit var deviceId : String
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -54,6 +60,9 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
         userPref =this.getSharedPreferences("user_info", 0)
         userEdit = userPref?.edit()
 
+        deviceId = Settings.Secure.getString(applicationContext.getContentResolver(),
+                Settings.Secure.ANDROID_ID)
+
 
         LocalBroadcastManager.getInstance(this).registerReceiver(
                 mMessageReceiver, IntentFilter("GPSLocationUpdates"));
@@ -63,7 +72,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
                 .findFragmentById(R.id.map) as SupportMapFragment
         mapFragment.getMapAsync(this)
 
-        switchLocation = findViewById(R.id.actionbar_switch)
         editTextName = findViewById(R.id.editTextName)
         buttonName = findViewById(R.id.buttonName)
         buttonImage = findViewById(R.id.buttonImage)
@@ -72,21 +80,20 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
 
         progressBar.visibility = View.VISIBLE
         settingsLayout.bringToFront()
-        switchLocation.isChecked = userPref!!.getBoolean("isVisible", true)
 
-        switchLocation.setOnCheckedChangeListener { buttonView, isChecked ->
-            userEdit?.putBoolean("isVisible", isChecked)
-            userEdit?.apply()
-        }
 
         buttonName.setOnClickListener {
             val name = editTextName.text.toString()
-            if (!name.equals("")){
+            if (name != ""){
                 userEdit?.putString("userName", name)
                 userEdit?.apply()
-                Toast.makeText(this, "Pseudo enregistré, mise à jour à la prochaine localisation", Toast.LENGTH_LONG).show()
+                val userHashMap = HashMap<String, String>()
+                userHashMap["deviceName"] = name
+                val ref = FirebaseDatabase.getInstance().getReference("position/" + deviceId)
+                ref.updateChildren(userHashMap as Map<String, Any>)
                 editTextName.text.clear()
                 editTextName.hint = name
+                Toast.makeText(this, "Pseudo changé", Toast.LENGTH_LONG).show()
             } else {
                 Toast.makeText(this, "Merci de choisir un pseudo", Toast.LENGTH_LONG).show()
             }
@@ -96,10 +103,8 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
             val intent = Intent()
             intent.type = "image/*"
             intent.action = Intent.ACTION_GET_CONTENT
-            startActivityForResult(Intent.createChooser(intent, "Select Picture"), 2)
+            startActivityForResult(Intent.createChooser(intent, "Select Picture"), RESULT_LOAD_IMAGE)
         }
-
-
     }
 
     /**
@@ -119,7 +124,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
             ActivityCompat.requestPermissions(this,
                     arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION), LOCATION_PERMISSION_RC)
         } else {
-            switchLocation.visibility = View.VISIBLE
             startService(Intent(this,LocalisationService::class.java))
             getData()
         }
@@ -129,12 +133,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
         val defaultPos = LatLng(defaultLat!!.toDouble(), defaultLong!!.toDouble())
         mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(defaultPos, 15f))
 
-        mMap.setOnInfoWindowLongClickListener {
-            val cibledUser = markerMap.get(it)
-            if (cibledUser != null) {
-                Toast.makeText(this, cibledUser.batteryLvl, Toast.LENGTH_LONG).show()
-            }
-        }
     }
 
     private val mMessageReceiver = object : BroadcastReceiver() {
@@ -156,33 +154,16 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
 
     private fun getData(){
         val databaseReference = FirebaseDatabase.getInstance().getReference("position")
-        markerMap = HashMap<Marker, UserClass>()
         databaseReference.addValueEventListener(object : ValueEventListener {
 
             override fun onDataChange(snapshot: DataSnapshot) {
-                mMap.clear()
                 for (postSnapshot in snapshot.getChildren()) {
-                    val deviceName = Settings.Secure.getString(getContentResolver(), "bluetooth_name")
                     val currentUser = postSnapshot.getValue(UserClass::class.java)
-                    if(currentUser!!.isVisible){
-                        val currentUserDeviceName = currentUser.deviceName
-                        val latLng = LatLng(currentUser.latitude!!, currentUser.longitude!!)
-                        var bitmapDescriptor: BitmapDescriptor?
-                        if(deviceName != null && deviceName.equals(currentUserDeviceName) || currentUser.deviceName.equals(userPref!!.getString("userName", deviceName))){
-                            bitmapDescriptor = BitmapDescriptorFactory.fromResource(R.drawable.quintero)
-                            editTextName.hint = currentUserDeviceName
-                        } else {
-                            bitmapDescriptor = BitmapDescriptorFactory.fromResource(R.drawable.risitete)
-                        }
 
-
-                        val marker : Marker = mMap.addMarker(MarkerOptions()
-                                .position(latLng)
-                                .title(currentUser.deviceName + " " + currentUser.batteryLvl + "% " + currentUser.captureDate)
-                                .icon(bitmapDescriptor))
-
-                        markerMap[marker] = currentUser
-
+                    if (localeCacheMap[currentUser!!.deviceId] == null){
+                        putMarker(currentUser)
+                    } else if (currentUser.latitude != localeCacheMap[currentUser.deviceId]!!.position.latitude || currentUser.longitude != localeCacheMap[currentUser.deviceId]!!.position.longitude){
+                        localeCacheMap[currentUser.deviceId]!!.position = LatLng(currentUser.latitude!!, currentUser.longitude!!)
                     }
                 }
             }
@@ -193,9 +174,47 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
         })
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent) {
+    private fun putMarker(currentUser : UserClass){
+        Thread({
+            val latLng = LatLng(currentUser.latitude!!, currentUser.longitude!!)
+            val bitmapDescriptor: BitmapDescriptor?
+            bitmapDescriptor = if(currentUser.pictureUrl != null){
+                val realUrl = URL(currentUser.pictureUrl)
+                val bmp : Bitmap = BitmapFactory.decodeStream(realUrl.openConnection().getInputStream())
+                BitmapDescriptorFactory.fromBitmap(Bitmap.createScaledBitmap(bmp,120, 120, false))
+            } else {
+                BitmapDescriptorFactory.fromResource(R.drawable.risitete)
+            }
+
+            runOnUiThread({
+                val marker : Marker = mMap.addMarker(MarkerOptions()
+                        .position(latLng)
+                        .title(currentUser.deviceName + " " + currentUser.batteryLvl + "% " + currentUser.captureDate)
+                        .icon(bitmapDescriptor))
+
+                localeCacheMap[currentUser.deviceId!!] = marker
+            })
+        }).start()
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        Toast.makeText(this, requestCode.toString(), Toast.LENGTH_LONG).show()
+        if (requestCode == RESULT_LOAD_IMAGE && data?.data != null){
+            val mStorage = FirebaseStorage.getInstance().getReference("Profile Pictures" + "/" + deviceId)
+            val image = data.data
+            mStorage.putFile(image).addOnSuccessListener {
+                mStorage.downloadUrl.addOnSuccessListener {
+                    val urlString = it.toString()
+                    val ref = FirebaseDatabase.getInstance().getReference("position/" + deviceId)
+                    val updateMap = HashMap<String, String>()
+                    updateMap["pictureUrl"] = urlString
+                    ref.updateChildren(updateMap as Map<String, Any>)
+                    Toast.makeText(this, "Image enregistrée, mise à jour à la prochaine localisation", Toast.LENGTH_LONG).show()
+
+                }
+            }
+
+        }
     }
 
     override fun onRequestPermissionsResult(requestCode : Int ,

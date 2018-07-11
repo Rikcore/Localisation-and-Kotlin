@@ -10,6 +10,7 @@ import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
 import android.support.v4.app.ActivityCompat
 import android.location.Location
+import android.net.Uri
 import android.os.Parcelable
 import android.provider.Settings
 import android.support.constraint.ConstraintLayout
@@ -43,6 +44,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
     private lateinit var progressBar: ProgressBar
 
     private var localeCacheMap = HashMap<String, Marker>()
+    private var localeCacheImageUrl = HashMap<String, String>()
 
     private lateinit var sensorManager : SensorManager
     private var mAccelLast : Double = 0.0
@@ -57,7 +59,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
         sensorManager.registerListener(this, sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER), SensorManager.SENSOR_DELAY_NORMAL)
 
-        userPref =this.getSharedPreferences("user_info", 0)
+        userPref = this.getSharedPreferences("user_info", 0)
         userEdit = userPref?.edit()
 
         deviceId = Settings.Secure.getString(applicationContext.getContentResolver(),
@@ -80,6 +82,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
 
         progressBar.visibility = View.VISIBLE
         settingsLayout.bringToFront()
+        editTextName.hint = userPref!!.getString("userName", "Pseudo")
 
 
         buttonName.setOnClickListener {
@@ -158,18 +161,24 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
 
             override fun onDataChange(snapshot: DataSnapshot) {
                 for (postSnapshot in snapshot.getChildren()) {
-                    val currentUser = postSnapshot.getValue(UserClass::class.java)
+                    val loopedUser = postSnapshot.getValue(UserClass::class.java)
+                    val loopedUserId = loopedUser!!.deviceId
 
-                    if (localeCacheMap[currentUser!!.deviceId] == null){
-                        putMarker(currentUser)
-                    } else if (currentUser.latitude != localeCacheMap[currentUser.deviceId]!!.position.latitude || currentUser.longitude != localeCacheMap[currentUser.deviceId]!!.position.longitude){
-                        localeCacheMap[currentUser.deviceId]!!.position = LatLng(currentUser.latitude!!, currentUser.longitude!!)
+                    if (localeCacheMap[loopedUserId] == null){
+                        putMarker(loopedUser)
+                    } else if (loopedUser.deviceName + " " + loopedUser.captureDate != localeCacheMap[loopedUserId]!!.title){
+                        localeCacheMap[loopedUserId]!!.title = loopedUser.deviceName + " " + loopedUser.captureDate
+                    } else if (loopedUser.pictureUrl != localeCacheImageUrl[loopedUserId]){
+                        localeCacheMap[loopedUserId]!!.remove()
+                        putMarker(loopedUser)
+                    } else if (loopedUser.latitude != localeCacheMap[loopedUserId]!!.position.latitude || loopedUser.longitude != localeCacheMap[loopedUserId]!!.position.longitude){
+                        localeCacheMap[loopedUserId]!!.position = LatLng(loopedUser.latitude!!, loopedUser.longitude!!)
                     }
                 }
             }
 
             override fun onCancelled(error: DatabaseError) {
-
+                Toast.makeText(this@MapsActivity, "Network error", Toast.LENGTH_LONG).show()
             }
         })
     }
@@ -189,10 +198,13 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
             runOnUiThread({
                 val marker : Marker = mMap.addMarker(MarkerOptions()
                         .position(latLng)
-                        .title(currentUser.deviceName + " " + currentUser.batteryLvl + "% " + currentUser.captureDate)
+                        .title(currentUser.deviceName + " " + currentUser.captureDate)
                         .icon(bitmapDescriptor))
 
                 localeCacheMap[currentUser.deviceId!!] = marker
+                if(currentUser.pictureUrl != null){
+                    localeCacheImageUrl[currentUser.deviceId!!] = currentUser.pictureUrl!!
+                }
             })
         }).start()
     }
@@ -200,20 +212,43 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == RESULT_LOAD_IMAGE && data?.data != null){
-            val mStorage = FirebaseStorage.getInstance().getReference("Profile Pictures" + "/" + deviceId)
             val image = data.data
-            mStorage.putFile(image).addOnSuccessListener {
-                mStorage.downloadUrl.addOnSuccessListener {
-                    val urlString = it.toString()
-                    val ref = FirebaseDatabase.getInstance().getReference("position/" + deviceId)
-                    val updateMap = HashMap<String, String>()
-                    updateMap["pictureUrl"] = urlString
-                    ref.updateChildren(updateMap as Map<String, Any>)
-                    Toast.makeText(this, "Image enregistrée, mise à jour à la prochaine localisation", Toast.LENGTH_LONG).show()
+            val inputStream = contentResolver.openInputStream(image)
+            val datasize = inputStream.available()
 
-                }
+            if(datasize < 200000){
+                saveImage(image)
+            } else {
+                Toast.makeText(this, "Image trop volumineuse, 200ko maximum.", Toast.LENGTH_LONG).show()
             }
 
+        }
+    }
+
+    private fun saveImage (uri: Uri){
+        val mStorage = FirebaseStorage.getInstance().getReference("Profile Pictures" + "/" + deviceId + System.currentTimeMillis())
+        mStorage.putFile(uri).addOnSuccessListener {
+            mStorage.downloadUrl.addOnSuccessListener {
+                val urlString = it.toString()
+                val ref = FirebaseDatabase.getInstance().getReference("position/" + deviceId)
+                val updateMap = HashMap<String, String>()
+                updateMap["pictureUrl"] = urlString
+                ref.updateChildren(updateMap as Map<String, Any>)
+                Toast.makeText(this, "Image enregistrée", Toast.LENGTH_LONG).show()
+
+                /*Thread({
+                    val realUrl = URL(urlString)
+                    val bmp : Bitmap = BitmapFactory.decodeStream(realUrl.openConnection().getInputStream())
+                    runOnUiThread({
+
+                        val bitmapDescriptor = BitmapDescriptorFactory.fromBitmap(Bitmap.createScaledBitmap(bmp,120, 120, false))
+                        localeCacheMap[deviceId]!!.setIcon(bitmapDescriptor)
+                    })
+                }).start()*/
+
+
+
+            }
         }
     }
 

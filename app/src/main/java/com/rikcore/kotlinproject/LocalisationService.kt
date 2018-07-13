@@ -47,6 +47,7 @@ class LocalisationService : Service() {
 
         try {
             locationManager?.requestLocationUpdates(LocationManager.NETWORK_PROVIDER,0L, 0f, locationListener)
+            locationManager?.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0L, 0f, locationListener)
         } catch (ex : SecurityException){
             Log.d("FAILED", "Security exception")
         }

@@ -14,9 +14,13 @@ import android.net.Uri
 import android.os.Parcelable
 import android.provider.Settings
 import android.support.constraint.ConstraintLayout
+import android.support.design.widget.FloatingActionButton
 import android.support.v4.content.LocalBroadcastManager
+import android.support.v7.app.AlertDialog
 import android.util.Log
 import android.view.View
+import android.view.animation.OvershootInterpolator
+import android.view.animation.ScaleAnimation
 import android.widget.*
 import com.google.android.gms.maps.*
 import com.google.firebase.database.DataSnapshot
@@ -29,7 +33,7 @@ import com.google.firebase.storage.FirebaseStorage
 import io.fabric.sdk.android.Fabric;
 import java.net.URL
 
-class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListener {
+class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
 
     private lateinit var mMap: GoogleMap
@@ -40,24 +44,23 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
     private lateinit var editTextName : EditText
     private lateinit var buttonName : Button
     private lateinit var buttonImage : Button
+    private lateinit var listViewMessage : ListView
     private lateinit var settingsLayout : ConstraintLayout
     private lateinit var progressBar: ProgressBar
+    private lateinit var floatingActionButtonOverlay: FloatingActionButton
 
     private var localeCacheMap = HashMap<String, Marker>()
     private var localeCacheImageUrl = HashMap<String, String>()
 
-    private lateinit var sensorManager : SensorManager
-    private var mAccelLast : Double = 0.0
-
     private val RESULT_LOAD_IMAGE = 111
     private lateinit var deviceId : String
+
+    private lateinit var customWindowsAdapter: CustomWindowsAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_maps)
         Fabric.with(this, Crashlytics())
-        sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
-        sensorManager.registerListener(this, sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER), SensorManager.SENSOR_DELAY_NORMAL)
 
         userPref = this.getSharedPreferences("user_info", 0)
         userEdit = userPref?.edit()
@@ -77,11 +80,15 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
         editTextName = findViewById(R.id.editTextName)
         buttonName = findViewById(R.id.buttonName)
         buttonImage = findViewById(R.id.buttonImage)
+        listViewMessage = findViewById(R.id.listViewMessage)
         settingsLayout = findViewById(R.id.settingsLayout)
         progressBar = findViewById(R.id.progressBar)
+        floatingActionButtonOverlay = findViewById(R.id.floatingActionButtonOverlay)
+
 
         progressBar.visibility = View.VISIBLE
         settingsLayout.bringToFront()
+        settingsLayout.visibility = View.INVISIBLE
         editTextName.hint = userPref!!.getString("userName", "Pseudo")
 
 
@@ -108,6 +115,53 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
             intent.action = Intent.ACTION_GET_CONTENT
             startActivityForResult(Intent.createChooser(intent, "Select Picture"), RESULT_LOAD_IMAGE)
         }
+
+        listViewMessage.setOnItemClickListener { adapterView, view, i, l ->
+            val selectedMessage = listViewMessage.adapter.getItem(i) as Message
+            val nodeId = selectedMessage.timeStamp
+
+            val ref = FirebaseDatabase.getInstance().getReference("messages/" + deviceId + "/" + nodeId)
+
+            ref.setValue(null)
+        }
+
+        floatingActionButtonOverlay.setOnClickListener {
+            if(settingsLayout.visibility == View.VISIBLE){
+                settingsLayout.visibility = View.GONE
+            } else {
+                settingsLayout.visibility= View.VISIBLE
+            }
+            val anim = android.view.animation.AnimationUtils.loadAnimation(floatingActionButtonOverlay.context,  R.anim.shake)
+            anim.duration = 200L;
+            floatingActionButtonOverlay.startAnimation(anim);
+
+        }
+
+
+    }
+
+    private fun openChat(user : UserClass){
+        val builder = AlertDialog.Builder(this)
+        builder.setTitle("Send message to : " + user.deviceName)
+        builder.setMessage("Max 140 characters")
+        val editTextMessage = EditText(this)
+        builder.setView(editTextMessage)
+
+        builder.setPositiveButton("Ok"){dialog, which ->
+            Toast.makeText(applicationContext,"Sending",Toast.LENGTH_SHORT).show()
+            val timeStamp = System.currentTimeMillis()
+            val ref = FirebaseDatabase.getInstance().getReference("messages/" + user.deviceId + "/" + timeStamp)
+
+            val message = Message(userPref!!.getString("userName", Settings.Secure.getString(contentResolver, "bluetooth_name")), deviceId, user.deviceName!!, user.deviceId!!, editTextMessage.text.toString(), timeStamp)
+
+            //val message = editTextMessage.text.toString()
+            ref.setValue(message)
+        }
+
+        val dialog : AlertDialog = builder.create()
+
+        dialog.show()
+
     }
 
     /**
@@ -129,12 +183,18 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
         } else {
             startService(Intent(this,LocalisationService::class.java))
             getData()
+            getMyMessage()
         }
 
         val defaultLat = userPref?.getString("latitude", "43.608316")
         val defaultLong = userPref?.getString("longitude", "1.441804")
         val defaultPos = LatLng(defaultLat!!.toDouble(), defaultLong!!.toDouble())
         mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(defaultPos, 15f))
+
+        mMap.setOnInfoWindowLongClickListener {
+            val selectedUser = it.tag as UserClass
+            openChat(selectedUser)
+        }
 
     }
 
@@ -166,15 +226,21 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
 
                     if (localeCacheMap[loopedUserId] == null){
                         putMarker(loopedUser)
-                    } else if (loopedUser.deviceName + " " + loopedUser.captureDate != localeCacheMap[loopedUserId]!!.title){
-                        localeCacheMap[loopedUserId]!!.title = loopedUser.deviceName + " " + loopedUser.captureDate
+                    } else if (loopedUser.deviceName != localeCacheMap[loopedUserId]!!.title){
+                        localeCacheMap[loopedUserId]!!.title = loopedUser.deviceName
+                        localeCacheMap[loopedUserId]!!.tag = loopedUser
+
                     } else if (loopedUser.pictureUrl != localeCacheImageUrl[loopedUserId]){
                         localeCacheMap[loopedUserId]!!.remove()
                         putMarker(loopedUser)
                     } else if (loopedUser.latitude != localeCacheMap[loopedUserId]!!.position.latitude || loopedUser.longitude != localeCacheMap[loopedUserId]!!.position.longitude){
                         localeCacheMap[loopedUserId]!!.position = LatLng(loopedUser.latitude!!, loopedUser.longitude!!)
+                        localeCacheMap[loopedUserId]!!.snippet = loopedUser.captureDate + "¤" + loopedUser.batteryLvl
+                        localeCacheMap[loopedUserId]!!.tag = loopedUser
                     }
                 }
+                customWindowsAdapter = CustomWindowsAdapter(this@MapsActivity)
+                mMap.setInfoWindowAdapter(customWindowsAdapter)
             }
 
             override fun onCancelled(error: DatabaseError) {
@@ -183,9 +249,40 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
         })
     }
 
+    private fun getMyMessage(){
+        val ref = FirebaseDatabase.getInstance().getReference("messages/" + deviceId)
+
+        ref.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(p0: DataSnapshot) {
+                val messageList = ArrayList<Message>()
+                for(postSnapshot in p0.children){
+                    val loopedMessage = postSnapshot.getValue(Message::class.java)
+                    messageList.add(loopedMessage!!)
+                }
+                val messageAdapter = MessageAdapter(this@MapsActivity, messageList)
+                listViewMessage.adapter = messageAdapter
+            }
+
+            override fun onCancelled(p0: DatabaseError) {
+                TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+            }
+        })
+    }
+
     private fun putMarker(currentUser : UserClass){
+        val latLng = LatLng(currentUser.latitude!!, currentUser.longitude!!)
+        val marker : Marker = mMap.addMarker(MarkerOptions()
+                .position(latLng)
+                .title(currentUser.deviceName)
+                .snippet(currentUser.captureDate + "¤" + currentUser.batteryLvl)
+        )
+        marker.tag = currentUser
+        localeCacheMap[currentUser.deviceId!!] = marker
+        if(currentUser.pictureUrl != null){
+            localeCacheImageUrl[currentUser.deviceId!!] = currentUser.pictureUrl!!
+        }
         Thread({
-            val latLng = LatLng(currentUser.latitude!!, currentUser.longitude!!)
+
             val bitmapDescriptor: BitmapDescriptor?
             bitmapDescriptor = if(currentUser.pictureUrl != null){
                 val realUrl = URL(currentUser.pictureUrl)
@@ -196,15 +293,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
             }
 
             runOnUiThread({
-                val marker : Marker = mMap.addMarker(MarkerOptions()
-                        .position(latLng)
-                        .title(currentUser.deviceName + " " + currentUser.captureDate)
-                        .icon(bitmapDescriptor))
-
-                localeCacheMap[currentUser.deviceId!!] = marker
-                if(currentUser.pictureUrl != null){
-                    localeCacheImageUrl[currentUser.deviceId!!] = currentUser.pictureUrl!!
-                }
+                localeCacheMap[currentUser.deviceId!!]!!.setIcon(bitmapDescriptor)
             })
         }).start()
     }
@@ -259,31 +348,13 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, SensorEventListene
             Log.d("PERMISSION", "User Permission for Location Granted")
             startService(Intent(this,LocalisationService::class.java))
             getData()
+            getMyMessage()
         }
     }
 
     public override fun onResume() {
         super.onResume()
         isFocused = false
-    }
-
-    override fun onAccuracyChanged(p0: Sensor?, p1: Int) {
-    }
-
-    override fun onSensorChanged(p0: SensorEvent?) {
-        val x = p0!!.values[0]
-        val y = p0.values[1]
-        val z = p0.values[2]
-        val mAccelCurrent = Math.sqrt((x * x + y * y + z * z).toDouble())
-        val delta = mAccelCurrent - mAccelLast
-        mAccelLast = mAccelCurrent
-        if (delta > 8) {
-            if(settingsLayout.visibility == View.VISIBLE){
-                settingsLayout.visibility = View.GONE
-            } else {
-                settingsLayout.visibility= View.VISIBLE
-            }
-        }
     }
 }
 

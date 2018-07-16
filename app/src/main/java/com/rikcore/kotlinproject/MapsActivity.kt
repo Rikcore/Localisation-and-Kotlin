@@ -1,11 +1,11 @@
 package com.rikcore.kotlinproject
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.*
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.hardware.*
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
 import android.support.v4.app.ActivityCompat
@@ -19,8 +19,7 @@ import android.support.v4.content.LocalBroadcastManager
 import android.support.v7.app.AlertDialog
 import android.util.Log
 import android.view.View
-import android.view.animation.OvershootInterpolator
-import android.view.animation.ScaleAnimation
+import android.view.animation.TranslateAnimation
 import android.widget.*
 import com.google.android.gms.maps.*
 import com.google.firebase.database.DataSnapshot
@@ -31,6 +30,7 @@ import com.crashlytics.android.Crashlytics;
 import com.google.android.gms.maps.model.*
 import com.google.firebase.storage.FirebaseStorage
 import io.fabric.sdk.android.Fabric;
+import me.leolin.shortcutbadger.ShortcutBadger
 import java.net.URL
 
 class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
@@ -57,6 +57,9 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private lateinit var customWindowsAdapter: CustomWindowsAdapter
 
+    private var isHiding = true
+
+    @SuppressLint("HardwareIds")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_maps)
@@ -65,7 +68,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         userPref = this.getSharedPreferences("user_info", 0)
         userEdit = userPref?.edit()
 
-        deviceId = Settings.Secure.getString(applicationContext.getContentResolver(),
+        deviceId = Settings.Secure.getString(applicationContext.contentResolver,
                 Settings.Secure.ANDROID_ID)
 
 
@@ -88,7 +91,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
         progressBar.visibility = View.VISIBLE
         settingsLayout.bringToFront()
-        settingsLayout.visibility = View.INVISIBLE
         editTextName.hint = userPref!!.getString("userName", "Pseudo")
 
 
@@ -119,24 +121,21 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         listViewMessage.setOnItemClickListener { adapterView, view, i, l ->
             val selectedMessage = listViewMessage.adapter.getItem(i) as Message
             val nodeId = selectedMessage.timeStamp
-
             val ref = FirebaseDatabase.getInstance().getReference("messages/" + deviceId + "/" + nodeId)
-
             ref.setValue(null)
         }
 
         floatingActionButtonOverlay.setOnClickListener {
-            if(settingsLayout.visibility == View.VISIBLE){
-                settingsLayout.visibility = View.GONE
+            if(isHiding){
+                slideDown(settingsLayout)
             } else {
-                settingsLayout.visibility= View.VISIBLE
+                slideUp(settingsLayout)
             }
+            isHiding = !isHiding
             val anim = android.view.animation.AnimationUtils.loadAnimation(floatingActionButtonOverlay.context,  R.anim.shake)
-            anim.duration = 200L;
-            floatingActionButtonOverlay.startAnimation(anim);
-
+            anim.duration = 200L
+            floatingActionButtonOverlay.startAnimation(anim)
         }
-
 
     }
 
@@ -151,17 +150,12 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             Toast.makeText(applicationContext,"Sending",Toast.LENGTH_SHORT).show()
             val timeStamp = System.currentTimeMillis()
             val ref = FirebaseDatabase.getInstance().getReference("messages/" + user.deviceId + "/" + timeStamp)
-
             val message = Message(userPref!!.getString("userName", Settings.Secure.getString(contentResolver, "bluetooth_name")), deviceId, user.deviceName!!, user.deviceId!!, editTextMessage.text.toString(), timeStamp)
-
-            //val message = editTextMessage.text.toString()
             ref.setValue(message)
         }
 
         val dialog : AlertDialog = builder.create()
-
         dialog.show()
-
     }
 
     /**
@@ -195,7 +189,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             val selectedUser = it.tag as UserClass
             openChat(selectedUser)
         }
-
     }
 
     private val mMessageReceiver = object : BroadcastReceiver() {
@@ -264,7 +257,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             }
 
             override fun onCancelled(p0: DatabaseError) {
-                TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+                Toast.makeText(this@MapsActivity, "Failed to get messages", Toast.LENGTH_LONG).show()
             }
         })
     }
@@ -287,7 +280,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             bitmapDescriptor = if(currentUser.pictureUrl != null){
                 val realUrl = URL(currentUser.pictureUrl)
                 val bmp : Bitmap = BitmapFactory.decodeStream(realUrl.openConnection().getInputStream())
-                BitmapDescriptorFactory.fromBitmap(Bitmap.createScaledBitmap(bmp,120, 120, false))
+                BitmapDescriptorFactory.fromBitmap(Bitmap.createScaledBitmap(bmp,180, 180, false))
             } else {
                 BitmapDescriptorFactory.fromResource(R.drawable.risitete)
             }
@@ -310,7 +303,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             } else {
                 Toast.makeText(this, "Image trop volumineuse, 200ko maximum.", Toast.LENGTH_LONG).show()
             }
-
         }
     }
 
@@ -324,19 +316,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 updateMap["pictureUrl"] = urlString
                 ref.updateChildren(updateMap as Map<String, Any>)
                 Toast.makeText(this, "Image enregistrée", Toast.LENGTH_LONG).show()
-
-                /*Thread({
-                    val realUrl = URL(urlString)
-                    val bmp : Bitmap = BitmapFactory.decodeStream(realUrl.openConnection().getInputStream())
-                    runOnUiThread({
-
-                        val bitmapDescriptor = BitmapDescriptorFactory.fromBitmap(Bitmap.createScaledBitmap(bmp,120, 120, false))
-                        localeCacheMap[deviceId]!!.setIcon(bitmapDescriptor)
-                    })
-                }).start()*/
-
-
-
             }
         }
     }
@@ -355,6 +334,18 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     public override fun onResume() {
         super.onResume()
         isFocused = false
+    }
+
+    private fun slideUp(view: View) {
+        view.animate()
+                .translationY(- view.height.toFloat())
+                .duration = 600
+    }
+
+    private fun slideDown(view: View) {
+        view.animate()
+                .translationY(view.height.toFloat())
+                .duration = 600
     }
 }
 

@@ -11,6 +11,6 @@ class ServiceReviverReceiver : BroadcastReceiver() {
         // This method is called when the BroadcastReceiver is receiving an Intent broadcast.
         val TAG = "RestartServiceReceiver"
         Log.e(TAG, "onReceive")
-        context.startService(Intent(context.getApplicationContext(), LocalisationService::class.java))
+        context.startService(Intent(context.applicationContext, LocalisationService::class.java))
     }
 }

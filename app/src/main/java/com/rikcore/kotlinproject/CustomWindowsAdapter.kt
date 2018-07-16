@@ -1,11 +1,6 @@
 package com.rikcore.kotlinproject
 
-import android.annotation.SuppressLint
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.os.Handler
-import android.support.compat.R.id.async
 import android.view.View
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.model.Marker
@@ -14,8 +9,6 @@ import android.widget.ImageView
 import android.widget.TextView
 import com.squareup.picasso.Callback
 import com.squareup.picasso.Picasso
-import java.util.concurrent.atomic.AtomicBoolean
-
 
 class CustomWindowsAdapter(private var context: Context) : GoogleMap.InfoWindowAdapter {
 
@@ -25,7 +18,6 @@ class CustomWindowsAdapter(private var context: Context) : GoogleMap.InfoWindowA
         val inflater = LayoutInflater.from(context)
         contentView = inflater.inflate(R.layout.custom_window_info, null)
     }
-
 
     override fun getInfoContents(p0: Marker?): View {
         val textViewName = contentView.findViewById<TextView>(R.id.textViewName)
@@ -47,7 +39,7 @@ class CustomWindowsAdapter(private var context: Context) : GoogleMap.InfoWindowA
         val user : UserClass = p0.tag as UserClass
 
         if(user.pictureUrl != null){
-            Picasso.with(context).load(user.pictureUrl).into(imageViewProfile, object :Callback {
+            Picasso.with(context).load(user.pictureUrl).into(imageViewProfile, object : Callback {
                 override fun onSuccess() {
                     if (p0.isInfoWindowShown) {
                         p0.hideInfoWindow()
@@ -69,6 +61,4 @@ class CustomWindowsAdapter(private var context: Context) : GoogleMap.InfoWindowA
     override fun getInfoWindow(p0: Marker?): View? {
         return null
     }
-
-
 }

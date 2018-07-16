@@ -1,5 +1,6 @@
 package com.rikcore.kotlinproject
 
+import android.annotation.SuppressLint
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -16,6 +17,11 @@ import java.text.SimpleDateFormat
 import java.util.*
 import android.os.*
 import android.net.ConnectivityManager
+import android.widget.Toast
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.ValueEventListener
+import me.leolin.shortcutbadger.ShortcutBadger
 import kotlin.collections.HashMap
 
 class LocalisationService : Service() {
@@ -23,6 +29,8 @@ class LocalisationService : Service() {
     private var locationManager : LocationManager? = null
     private var userPref: SharedPreferences? = null
     private var userEdit: SharedPreferences.Editor? = null
+
+    private var lastLocation: Location? = null
 
     override fun onBind(intent: Intent): IBinder {
         throw UnsupportedOperationException("Not yet implemented");
@@ -32,6 +40,7 @@ class LocalisationService : Service() {
         userPref = this.getSharedPreferences("user_info", 0)
         userEdit = userPref?.edit()
         getLocation()
+        checkMessage()
         return Service.START_STICKY
     }
 
@@ -55,7 +64,6 @@ class LocalisationService : Service() {
 
     private val locationListener: LocationListener = object : LocationListener {
         override fun onLocationChanged(location: Location) {
-            //Do some shit
             localSaveLocation(location)
             val deviceId = getDeviceId()
             val deviceName = userPref!!.getString("userName", Settings.Secure.getString(contentResolver, "bluetooth_name"))
@@ -64,7 +72,9 @@ class LocalisationService : Service() {
             val chargeStatus = chargeStatus(applicationContext)
             val memory = getMemoryAvailable()
             val network = chkStatus()
-            val myProfile = UserClass(deviceId, deviceName, batLevel, location.latitude, location.longitude, currentDate, chargeStatus, memory, network, getUptime())
+            val uptime = getUptime()
+            val speed = calculateSpeed(location)
+            val myProfile = UserClass(deviceId, deviceName, batLevel, location.latitude, location.longitude, currentDate, chargeStatus, memory, network, uptime, speed)
             sendData(myProfile)
             sendMessageToActivity(location, "Position")
         }
@@ -78,8 +88,9 @@ class LocalisationService : Service() {
         userEdit?.putString("longitude", location.longitude.toString())
     }
 
+    @SuppressLint("HardwareIds")
     private fun getDeviceId() : String {
-        return Settings.Secure.getString(applicationContext.getContentResolver(),
+        return Settings.Secure.getString(applicationContext.contentResolver,
                 Settings.Secure.ANDROID_ID)
     }
 
@@ -95,7 +106,6 @@ class LocalisationService : Service() {
 
     private fun sendMessageToActivity(l: Location, msg: String) {
         val intent = Intent("GPSLocationUpdates")
-        // You can also include some extra data.
         intent.putExtra("Status", msg)
         val b = Bundle()
         b.putParcelable("Location", l)
@@ -117,6 +127,7 @@ class LocalisationService : Service() {
         userMap["memoryAvailable"] = user.memoryAvailable
         userMap["networkStatus"] = user.networkStatus
         userMap["uptime"] = user.uptime
+        userMap["speed"] = user.speed
         myRef.updateChildren(userMap)
     }
 
@@ -156,5 +167,55 @@ class LocalisationService : Service() {
         return (SystemClock.elapsedRealtime() / 1000 / 60 / 60).toInt()
     }
 
+    private fun checkMessage(){
+        val ref = FirebaseDatabase.getInstance().getReference("messages/" + getDeviceId())
+
+        ref.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(p0: DataSnapshot) {
+                var messageQuantity = 0
+                for(postSnapshot in p0.children){
+                    messageQuantity++
+                }
+                ShortcutBadger.applyCount(applicationContext, messageQuantity)
+            }
+
+            override fun onCancelled(p0: DatabaseError) {
+            }
+        })
+    }
+
+    private fun calculateSpeed(location: Location) : Int {
+        var speed : Int = 0
+            if (this.lastLocation != null){
+                /*speed = (Math.sqrt(
+                        Math.pow(location.longitude - lastLocation!!.longitude, 2.0)
+                                + Math.pow(location.latitude - lastLocation!!.latitude, 2.0)
+                ) / (location.time - this.lastLocation!!.time)).toInt()
+                Toast.makeText(applicationContext, "Manual speed : " + speed + "m/s", Toast.LENGTH_LONG).show()*/
+                val dLat = Math.toRadians(location.latitude - lastLocation!!.latitude)
+                val dLon = Math.toRadians(location.longitude - lastLocation!!.longitude)
+                val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + (Math.cos(Math.toRadians(location.latitude))
+                        * Math.cos(Math.toRadians(lastLocation!!.latitude)) * Math.sin(dLon / 2)
+                        * Math.sin(dLon / 2))
+                val c = 2 * Math.asin(Math.sqrt(a))
+                val distanceInMeters = Math.round(6371000 * c)
+                speed = (distanceInMeters * 3.6).toInt()
+            }
+
+            //if there is speed from location
+            if (location.hasSpeed()){
+                //get location speed
+                speed = (location.speed * 3.6).toInt()
+                Toast.makeText(applicationContext, "Automatic speed : " + speed + "km/h", Toast.LENGTH_LONG).show()
+            }
+
+
+            this.lastLocation = location
+            ////////////
+            //DO WHAT YOU WANT WITH speed VARIABLE
+            ////////////
+
+        return speed
+    }
 
 }

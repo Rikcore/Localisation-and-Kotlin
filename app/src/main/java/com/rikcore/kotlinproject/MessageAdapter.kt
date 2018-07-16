@@ -9,7 +9,7 @@ import android.widget.TextView
 import java.text.SimpleDateFormat
 import java.util.*
 
-class MessageAdapter(var context: Context, var messageList: ArrayList<Message>) : BaseAdapter() {
+class MessageAdapter(context: Context, var messageList: ArrayList<Message>) : BaseAdapter() {
 
     private val layoutInflater = LayoutInflater.from(context)
 
@@ -23,7 +23,7 @@ class MessageAdapter(var context: Context, var messageList: ArrayList<Message>) 
 
             val message = messageList[p0]
             textViewSender.text = message.sender
-            val sdf = SimpleDateFormat("dd/MM/yyyy HH:mm")
+            val sdf = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.FRANCE)
             val calendar = Calendar.getInstance()
             calendar.timeInMillis = message.timeStamp!!
             val date = sdf.format(calendar.time)

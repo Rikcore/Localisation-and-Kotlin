@@ -1,7 +1,7 @@
 package com.rikcore.kotlinproject
 
 import android.annotation.SuppressLint
-import android.app.Service
+import android.app.*
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -177,6 +177,11 @@ class LocalisationService : Service() {
                     messageQuantity++
                 }
                 ShortcutBadger.applyCount(applicationContext, messageQuantity)
+                val storedQuantity = userPref!!.getInt("messageQuantity", 99999)
+                if (messageQuantity > storedQuantity){
+                    sendLittleNotif()
+                }
+                userEdit!!.putInt("messageQuantity", messageQuantity).commit()
             }
 
             override fun onCancelled(p0: DatabaseError) {
@@ -186,10 +191,9 @@ class LocalisationService : Service() {
 
     private fun calculateSpeed(location: Location) : Int {
         var speed : Int = 0
-
         if (location.hasSpeed()){
             speed = (location.speed * 3.6).toInt()
-            Toast.makeText(applicationContext, "Automatic speed : " + speed + "km/h", Toast.LENGTH_LONG).show()
+            Toast.makeText(applicationContext, "Automatic speed : " + speed + "km/h", Toast.LENGTH_SHORT).show()
         } else if (this.lastLocation != null){
             val dLat = Math.toRadians(location.latitude - lastLocation!!.latitude)
             val dLon = Math.toRadians(location.longitude - lastLocation!!.longitude)
@@ -203,6 +207,49 @@ class LocalisationService : Service() {
         this.lastLocation = location
 
         return speed
+    }
+
+    private fun sendLittleNotif(){
+        val notificationID = 101
+        val channelID = "notify_001"
+
+        val notificationManager =
+                getSystemService(
+                        Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        val intent = Intent(this, MapsActivity::class.java)
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        val pendingIntent = PendingIntent.getActivity(this, 0, intent,
+                PendingIntent.FLAG_ONE_SHOT)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val importance = NotificationManager.IMPORTANCE_HIGH
+            val channel = NotificationChannel(channelID,
+                    "Channel human readable title",
+                    importance)
+            notificationManager.createNotificationChannel(channel);
+        }
+
+        val notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Notification.Builder(this,
+                    channelID)
+                    .setContentTitle("Message")
+                    .setContentText("Vous avez reçu un nouveau message.")
+                    .setSmallIcon(R.mipmap.globe_icon_mini)
+                    .setChannelId(channelID)
+                    .setContentIntent(pendingIntent)
+                    .build()
+        } else {
+            Notification.Builder(this)
+                    .setContentTitle("Message")
+                    .setContentText("Vous avez reçu un nouveau message.")
+                    .setSmallIcon(R.mipmap.globe_icon_mini)
+                    .setContentIntent(pendingIntent)
+                    .build()
+        }
+
+
+        notificationManager.notify(notificationID, notification)
     }
 
 }

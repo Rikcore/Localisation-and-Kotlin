@@ -34,6 +34,4 @@ class UserClass {
         this.uptime = uptime
         this.speed = speed
     }
-
-
 }

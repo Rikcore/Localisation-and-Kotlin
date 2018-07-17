@@ -2,6 +2,10 @@ package com.rikcore.kotlinproject
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.*
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -11,6 +15,7 @@ import android.os.Bundle
 import android.support.v4.app.ActivityCompat
 import android.location.Location
 import android.net.Uri
+import android.os.Build
 import android.os.Parcelable
 import android.provider.Settings
 import android.support.constraint.ConstraintLayout

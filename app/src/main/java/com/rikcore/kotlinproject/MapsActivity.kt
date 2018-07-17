@@ -282,7 +282,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 val bmp : Bitmap = BitmapFactory.decodeStream(realUrl.openConnection().getInputStream())
                 BitmapDescriptorFactory.fromBitmap(Bitmap.createScaledBitmap(bmp,180, 180, false))
             } else {
-                BitmapDescriptorFactory.fromResource(R.drawable.risitete)
+                BitmapDescriptorFactory.fromResource(R.mipmap.globe_icon_mini)
             }
 
             runOnUiThread({

@@ -186,34 +186,21 @@ class LocalisationService : Service() {
 
     private fun calculateSpeed(location: Location) : Int {
         var speed : Int = 0
-            if (this.lastLocation != null){
-                /*speed = (Math.sqrt(
-                        Math.pow(location.longitude - lastLocation!!.longitude, 2.0)
-                                + Math.pow(location.latitude - lastLocation!!.latitude, 2.0)
-                ) / (location.time - this.lastLocation!!.time)).toInt()
-                Toast.makeText(applicationContext, "Manual speed : " + speed + "m/s", Toast.LENGTH_LONG).show()*/
-                val dLat = Math.toRadians(location.latitude - lastLocation!!.latitude)
-                val dLon = Math.toRadians(location.longitude - lastLocation!!.longitude)
-                val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + (Math.cos(Math.toRadians(location.latitude))
-                        * Math.cos(Math.toRadians(lastLocation!!.latitude)) * Math.sin(dLon / 2)
-                        * Math.sin(dLon / 2))
-                val c = 2 * Math.asin(Math.sqrt(a))
-                val distanceInMeters = Math.round(6371000 * c)
-                speed = (distanceInMeters * 3.6).toInt()
+
+        if (location.hasSpeed()){
+            speed = (location.speed * 3.6).toInt()
+            Toast.makeText(applicationContext, "Automatic speed : " + speed + "km/h", Toast.LENGTH_LONG).show()
+        } else if (this.lastLocation != null){
+            val dLat = Math.toRadians(location.latitude - lastLocation!!.latitude)
+            val dLon = Math.toRadians(location.longitude - lastLocation!!.longitude)
+            val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + (Math.cos(Math.toRadians(location.latitude))
+                    * Math.cos(Math.toRadians(lastLocation!!.latitude)) * Math.sin(dLon / 2)
+                    * Math.sin(dLon / 2))
+            val c = 2 * Math.asin(Math.sqrt(a))
+            val distanceInMeters = Math.round(6371000 * c)
+            speed = (distanceInMeters * 3.6).toInt()
             }
-
-            //if there is speed from location
-            if (location.hasSpeed()){
-                //get location speed
-                speed = (location.speed * 3.6).toInt()
-                Toast.makeText(applicationContext, "Automatic speed : " + speed + "km/h", Toast.LENGTH_LONG).show()
-            }
-
-
-            this.lastLocation = location
-            ////////////
-            //DO WHAT YOU WANT WITH speed VARIABLE
-            ////////////
+        this.lastLocation = location
 
         return speed
     }

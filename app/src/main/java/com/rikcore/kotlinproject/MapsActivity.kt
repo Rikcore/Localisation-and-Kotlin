@@ -183,6 +183,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             startService(Intent(this,LocalisationService::class.java))
             getData()
             getMyMessage()
+            floatingActionButtonOverlay.visibility = View.VISIBLE
         }
 
         val defaultLat = userPref?.getString("latitude", "43.608316")
@@ -198,7 +199,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private val mMessageReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            // Get extra data included in the Intent
             val message = intent.getStringExtra("Status")
             val b = intent.getBundleExtra("Location")
             val lastKnownLoc = b.getParcelable<Parcelable>("Location") as Location
@@ -325,14 +325,13 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
-    override fun onRequestPermissionsResult(requestCode : Int ,
-                                            permissions: Array<String>,
-                                            grantResults: IntArray){
+    override fun onRequestPermissionsResult(requestCode : Int , permissions: Array<String>, grantResults: IntArray){
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             Log.d("PERMISSION", "User Permission for Location Granted")
             startService(Intent(this,LocalisationService::class.java))
             getData()
             getMyMessage()
+            floatingActionButtonOverlay.visibility = View.VISIBLE
         }
     }
 

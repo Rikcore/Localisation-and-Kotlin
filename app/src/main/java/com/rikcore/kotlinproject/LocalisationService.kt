@@ -18,6 +18,7 @@ import java.util.*
 import android.os.*
 import android.net.ConnectivityManager
 import android.widget.Toast
+import com.google.android.gms.maps.model.LatLng
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.ValueEventListener
@@ -247,9 +248,6 @@ class LocalisationService : Service() {
                     .setContentIntent(pendingIntent)
                     .build()
         }
-
-
         notificationManager.notify(notificationID, notification)
     }
-
 }

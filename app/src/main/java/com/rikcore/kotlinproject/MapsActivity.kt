@@ -242,7 +242,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             }
 
             override fun onCancelled(error: DatabaseError) {
-                Toast.makeText(this@MapsActivity, "Network error", Toast.LENGTH_LONG).show()
+                Toast.makeText(this@MapsActivity, error.code, Toast.LENGTH_LONG).show()
             }
         })
     }
@@ -262,7 +262,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             }
 
             override fun onCancelled(p0: DatabaseError) {
-                Toast.makeText(this@MapsActivity, "Failed to get messages", Toast.LENGTH_LONG).show()
+                Toast.makeText(this@MapsActivity, p0.code, Toast.LENGTH_LONG).show()
             }
         })
     }

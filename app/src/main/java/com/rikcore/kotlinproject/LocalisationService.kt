@@ -186,6 +186,7 @@ class LocalisationService : Service() {
             }
 
             override fun onCancelled(p0: DatabaseError) {
+                Toast.makeText(this@LocalisationService, p0.code, Toast.LENGTH_LONG).show()
             }
         })
     }

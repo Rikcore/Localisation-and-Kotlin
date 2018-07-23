@@ -18,7 +18,6 @@ import java.util.*
 import android.os.*
 import android.net.ConnectivityManager
 import android.widget.Toast
-import com.google.android.gms.maps.model.LatLng
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.ValueEventListener
@@ -192,7 +191,7 @@ class LocalisationService : Service() {
     }
 
     private fun calculateSpeed(location: Location) : Int {
-        var speed : Int = 0
+        var speed = 0
         if (location.hasSpeed()){
             speed = (location.speed * 3.6).toInt()
             Toast.makeText(applicationContext, "Automatic speed : " + speed + "km/h", Toast.LENGTH_SHORT).show()
